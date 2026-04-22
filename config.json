@@ -1,0 +1,21 @@
+{
+  "google_sheets": {
+    "scopes": [
+      "https://www.googleapis.com/auth/spreadsheets.readonly"
+    ],
+    "credentials_file": "credentials.json",
+    "default_sheet_id": "YOUR_SHEET_ID"
+  },
+  "sql_server": {
+    "default_server": "localhost",
+    "default_database": "YOUR_DATABASE",
+    "use_windows_auth": true
+  },
+  "sql_generation": {
+    "string_type": "VARCHAR(MAX)",
+    "int_type": "INT",
+    "float_type": "FLOAT",
+    "bool_type": "BIT",
+    "datetime_type": "DATETIME"
+  }
+}
