@@ -98,7 +98,7 @@ python .\GoogleSheet_to_SQL.py
 
 
 ```bash
-.\GoogleSheet_to_SQL.exe
+GoogleSheet_to_SQL.exe
 ```
 
 **Vantaggi dell'eseguibile:**
