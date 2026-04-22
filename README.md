@@ -123,18 +123,20 @@ Lo script genera:
 ### Esempio output:
 
 ```sql
--- Created: 2026-04-21 10:30:45
+-- Created: 2026-04-21 10:30:45;
 
-CREATE TABLE Clienti (
-    Nome TEXT,
-    Email TEXT,
-    Eta REAL,
-    Data_Iscrizione TEXT
+DROP TABLE IF EXISTS [Clienti];
+
+CREATE TABLE [Clienti] (
+    [Nome] VARCHAR(MAX),
+    [Email] VARCHAR(MAX),
+    [Eta] INT,
+    [Data_Iscrizione] DATETIME
 );
 
--- Insert 150 records
-INSERT INTO Clienti VALUES ('Mario Rossi', 'mario@example.com', '28', '2024-01-15');
-INSERT INTO Clienti VALUES ('Anna Bianchi', 'anna@example.com', '34', '2024-02-20');
+-- Insert 150 records;
+INSERT INTO [Clienti] VALUES ('Mario Rossi', 'mario@example.com', '28', '2024-01-15');
+INSERT INTO [Clienti] VALUES ('Anna Bianchi', 'anna@example.com', '34', '2024-02-20');
 ...
 ```
 
