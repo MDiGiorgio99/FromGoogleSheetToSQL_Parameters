@@ -21,9 +21,11 @@ def load_config(config_file: str = 'config.json') -> dict:
     except FileNotFoundError:
         print(f"❌ Errore: File '{config_file}' non trovato.")
         print("   Crea un file config.json nella stessa cartella dello script")
+        input("\nPremi INVIO per chiudere...")
         sys.exit(1)
     except json.JSONDecodeError:
         print(f"❌ Errore: Il file '{config_file}' non è un JSON valido")
+        input("\nPremi INVIO per chiudere...")
         sys.exit(1)
 
 # Carica configurazione globale
@@ -45,9 +47,11 @@ class GoogleSheetToSQL:
         except FileNotFoundError:
             print(f"❌ Errore: File '{credentials_file}' non trovato.")
             print("   Scarica le credenziali da Google Cloud Console e rinomina il file")
+            input("\nPremi INVIO per chiudere...")
             sys.exit(1)
         except Exception as e:
             print(f"❌ Errore di autenticazione: {e}")
+            input("\nPremi INVIO per chiudere...")
             sys.exit(1)
 
     def open_spreadsheet(self, spreadsheet_id: str):
@@ -62,6 +66,7 @@ class GoogleSheetToSQL:
             print("   1. Verifica l'ID del Google Sheet (deve essere la parte della URL dopo /d/)")
             print("   2. Condividi il Google Sheet con l'email del service account")
             print("   3. Verifica che le credenziali siano corrette in credentials.json")
+            input("\nPremi INVIO per chiudere...")
             sys.exit(1)
 
     def list_sheets(self) -> List[str]:
@@ -498,6 +503,7 @@ def main():
     
     if not sheet_id:
         print("❌ ID non fornito")
+        input("\nPremi INVIO per chiudere...")
         sys.exit(1)
     
     # Inizializza
