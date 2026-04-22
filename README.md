@@ -66,7 +66,7 @@ Lo script legge tutte le configurazioni dal file **`config.json`** nella stessa 
 ```json
 {
   "default_server": "localhost",
-  "default_database": "TestExtraction",
+  "default_database": "YOUR_DATABASE",
   "use_windows_auth": true
 }
 ```
