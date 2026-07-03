@@ -63,7 +63,7 @@ https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE/edit#gid=0
 ## 📋 File di Configurazione
 
 ### batch.json
-File che specifica quali fogli estrarre e come procesarli:
+File che specifica quali fogli estrarre e come processarli:
 
 ```json
 [
