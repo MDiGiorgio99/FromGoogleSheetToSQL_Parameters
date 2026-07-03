@@ -208,7 +208,7 @@ Clicca "New" e imposta:
 
 ```
 Program/script:
-C:\Latitudo\FromGoogleSheetToSQL_Parameters\dist\GoogleSheet_to_SQL.exe
+C:\Latitudo\FromGoogleSheetToSQL_Parameters\GoogleSheet_to_SQL.exe
 
 Add arguments:
 batch.json
