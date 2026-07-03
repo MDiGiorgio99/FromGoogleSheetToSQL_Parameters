@@ -1,18 +1,25 @@
-# Google Sheets to SQL Converter
+# Google Sheets to SQL Converter - Batch Mode
 
-Converti automaticamente Google Sheets in SQL
+Estrae automaticamente dati da molteplici Google Sheets e li inserisce in SQL Server **senza interazione manuale**.
+
+## 🚀 Nuove Caratteristiche (v2.0)
+
+- ✅ **Modalità Batch**: Processa automaticamente múltiples fogli da un file di configurazione
+- ✅ **Nessun Menù Interattivo**: Esecuzione completamente automatica
+- ✅ **3 Modalità di Elaborazione**: CREATE (ricrea tabella), TRUNCATE (svuota), INSERT (aggiungi dati)
+- ✅ **Logging Dettagliato**: Visualizza il progresso dell'esecuzione in tempo reale
 
 ## Setup Iniziale
 
 ### 1. Installa le dipendenze
 
 ```bash
-pip install gspread google-auth-oauthlib google-auth-httplib2 pyperclip
+pip install gspread google-auth-oauthlib google-auth-httplib2 pyodbc
 ```
 
 - **gspread**: Accesso a Google Sheets
 - **google-auth-***: Autenticazione OAuth2
-- **pyperclip**: Copia negli appunti (opzionale)
+- **pyodbc**: Connessione a SQL Server
 
 ### 2. Ottieni le credenziali da Google Cloud Console
 
@@ -46,104 +53,270 @@ https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE/edit#gid=0
                                       ↑ copia questo ↑
 ```
 
-## Configurazione (config.json)
+## 📋 File di Configurazione
 
-Lo script legge tutte le configurazioni dal file **`config.json`** nella stessa cartella.
+### BATCH.json
+File che specifica quali fogli estrarre e come procesarli:
 
-### Sezioni configurabili:
+```json
+[
+  {
+    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
+    "sheet": "Dati_Vendite",
+    "dropCreate": "create"
+  },
+  {
+    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
+    "sheet": "Clienti",
+    "dropCreate": "truncate"
+  },
+  {
+    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
+    "sheet": "Storico",
+    "dropCreate": "insert"
+  }
+]
+```
 
-#### `google_sheets`
+**Campi:**
+- `spreadsheet`: ID del Google Sheet (da URL: `/d/{ID}/edit`)
+- `sheet`: Nome esatto del foglio da estrarre
+- `dropCreate`: Modalità di elaborazione:
+  - **`"create"`**: DROP TABLE IF EXISTS + CREATE TABLE + INSERT (ricrea la tabella)
+  - **`"truncate"`**: TRUNCATE TABLE + INSERT (svuota ma mantiene la struttura)
+  - **`"insert"`**: Solo INSERT (aggiunge ai dati esistenti)
+
+### config.json
+Mantiene le configurazioni di connessione:
+
 ```json
 {
-  "credentials_file": "credentials.json",
-  "default_sheet_id": "YOUR_SHEET_ID"
+  "google_sheets": {
+    "credentials_file": "credentials.json"
+  },
+  "sql_server": {
+    "default_server": "localhost",
+    "default_database": "TestExtraction",
+    "use_windows_auth": true,
+    "username": null,
+    "password": null
+  },
+  "sql_generation": {
+    "string_type": "VARCHAR(MAX)",
+    "int_type": "INT",
+    "float_type": "FLOAT",
+    "bool_type": "BIT",
+    "datetime_type": "DATETIME"
+  }
 }
 ```
-- **`credentials_file`**: percorso al file JSON con le credenziali (scaricato da Google Cloud)
-- **`default_sheet_id`**: ID del Google Sheet (opzionale, chiede all'avvio se non presente)
 
-#### `sql_server`
+**Campi:**
+- `credentials_file`: percorso al file JSON con le credenziali
+- `default_server`: nome del server SQL Server
+- `default_database`: database di destinazione
+- `use_windows_auth`: `true` per autenticazione Windows, `false` per SQL Server
+- `username`: username SQL Server (usato solo se `use_windows_auth` è `false`)
+- `password`: password SQL Server (usato solo se `use_windows_auth` è `false`)
+
+#### Modalità Autenticazione
+
+**Autenticazione Windows** (predefinita):
 ```json
-{
+"sql_server": {
   "default_server": "localhost",
-  "default_database": "YOUR_DATABASE",
-  "use_windows_auth": true
+  "default_database": "TestExtraction",
+  "use_windows_auth": true,
+  "username": null,
+  "password": null
 }
 ```
-- **`default_server`**: nome del server SQL Server (es: `localhost`, `.\\SQLEXPRESS`, `192.168.1.100`)
-- **`default_database`**: database di destinazione
-- **`use_windows_auth`**: `true` per autenticazione Windows, `false` per username/password
+✅ Usa le credenziali dell'utente Windows attualmente loggato
 
-#### `sql_generation`
+**Autenticazione SQL Server**:
 ```json
-{
-  "string_type": "VARCHAR(MAX)",
-  "int_type": "INT",
-  "float_type": "FLOAT",
-  "bool_type": "BIT",
-  "datetime_type": "DATETIME"
+"sql_server": {
+  "default_server": "localhost",
+  "default_database": "TestExtraction",
+  "use_windows_auth": false,
+  "username": "sa",
+  "password": "TuaPassword123"
 }
 ```
-- Personalizza i tipi SQL usati per le colonne
+✅ Usa username e password per connettersi a SQL Server
 
-## Come usare lo script
+## ▶️ Come Usare
 
-### Opzione 1: Esegui lo script Python
-
+### Esecuzione con Python:
 ```bash
-python .\GoogleSheet_to_SQL.py
+python GoogleSheet_to_SQL.py batch.json
 ```
 
-### Opzione 2: Esegui l'eseguibile 
+### Esecuzione con l'Eseguibile:
 
-
+#### Dalla riga di comando (PowerShell/CMD):
 ```bash
-GoogleSheet_to_SQL.exe
+cd C:\Latitudo\FromGoogleSheetToSQL_Parameters
+.\GoogleSheet_to_SQL.exe batch.json
 ```
 
-**Vantaggi dell'eseguibile:**
-- ✅ Non devi installare Python
-- ✅ Modifica il `config.json` quando vuoi - si aggiorna automaticamente!
-- ✅ Più veloce da avviare
+#### Automaticamente con Windows Task Scheduler:
+Vedi la sezione **"Schedulazione Automatica (Windows Task Scheduler)"** sotto per le istruzioni complete.
 
-### Flusso interattivo:
-1. **Incolla l'ID del Google Sheet** quando richiesto
-2. **Scegli il foglio** dal menu (1, 2, 3, ...)
-3. **Visualizza anteprima** dei dati estratti
-4. **Salva il file SQL** (opzionale) oppure esegui su db
-5. **Copia negli appunti** (opzionale)
+⚠️ **Il file di configurazione è obbligatorio** - deve essere specificato come parametro della riga di comando.
 
-## Output
+## �️ Schedulazione Automatica (Windows Task Scheduler)
 
-Lo script genera:
-- ✅ **CREATE TABLE** con tipo di colonne inferito automaticamente
-- ✅ **INSERT statements** per tutti i record
-- ✅ File `.sql` salvato localmente (opzionale)
+È possibile schedulare l'esecuzione automatica del programma su Windows per sincronizzare i dati periodicamente.
 
-### Esempio output:
+L'eseguibile è già disponibile nella cartella del progetto: `GoogleSheet_to_SQL.exe`
 
-```sql
--- Created: 2026-04-21 10:30:45;
+### 1. Apri Task Scheduler
 
-DROP TABLE IF EXISTS [Clienti];
+- Premi `Win + R`
+- Digita: `taskschd.msc`
+- Premi `Invio`
 
-CREATE TABLE [Clienti] (
-    [Nome] VARCHAR(MAX),
-    [Email] VARCHAR(MAX),
-    [Eta] INT,
-    [Data_Iscrizione] DATETIME
-);
+### 2. Crea una Nuova Attività
 
--- Insert 150 records;
-INSERT INTO [Clienti] VALUES ('Mario Rossi', 'mario@example.com', '28', '2024-01-15');
-INSERT INTO [Clienti] VALUES ('Anna Bianchi', 'anna@example.com', '34', '2024-02-20');
-...
+1. **Nel pannello sinistro**: Clicca su "Task Scheduler Library"
+2. **Nel pannello destro**: Clicca su "Create Basic Task..."
+
+### 3. Configura l'Attività - Scheda "General"
+
+- **Nome**: `GoogleSheet_to_SQL_Batch`
+- **Descrizione**: `Sincronizzazione automatica Google Sheets to SQL Server`
+- Spunta: ✓ "Run whether user is logged in or not"
+- Spunta: ✓ "Run with highest privileges"
+
+### 4. Configura i Trigger - Scheda "Triggers"
+
+Clicca "New" e scegli la frequenza:
+
+- **Giornaliera**: Alle 02:00 AM
+- **Settimanale**: Lunedì alle 02:00 AM
+- **Mensile**: Primo giorno del mese alle 02:00 AM
+
+Personalizza secondo le tue necessità e clicca "OK"
+
+### 5. Configura l'Azione - Scheda "Actions"
+
+Clicca "New" e imposta:
+
+```
+Program/script:
+C:\Latitudo\FromGoogleSheetToSQL_Parameters\dist\GoogleSheet_to_SQL.exe
+
+Add arguments (optional):
+batch.json
+
+Start in (optional):
+C:\Latitudo\FromGoogleSheetToSQL_Parameters
 ```
 
-## Note
+⚠️ **Importante**: Il campo "Start in" DEVE contenere il percorso della cartella di lavoro, altrimenti il programma non troverà `config.json` e `batch.json`
 
-- ⚠️ I nomi delle colonne vengono puliti (spazi → `_`, trattini → `_`)
-- 📊 I tipi di dati vengono inferiti dai valori 
-- 🔒 Le credenziali rimangono locali nel tuo PC
-- 🔄 Lo script supporta fogli con diverse colonne
-- ⚙️ **Personalizza tutto dal file `config.json`** senza modificare il codice Python
+### 6. Salva e Testa
+
+- Clicca "Finish"
+- Fai clic destro sull'attività creata
+- Seleziona "Run"
+- Verifica che il file log sia creato in: `log/batch_execution_*.log`
+
+### 7. Visualizza i Log
+
+I log di ogni esecuzione automatica saranno salvati in:
+```
+C:\Latitudo\FromGoogleSheetToSQL_Parameters\log\
+```
+
+Ogni file contiene:
+- ✓ Ogni statement INSERT eseguito
+- ❌ Errori SQL (se presenti)
+- 📊 Riepilogo dell'elaborazione
+
+Esempio di log:
+```
+2026-07-03 02:00:45 - INFO - ======================================================================
+2026-07-03 02:00:45 - INFO - INIZIO ELABORAZIONE BATCH: 2 foglio/i
+2026-07-03 02:00:45 - INFO - [1/2] Elaborazione: Sheet 'Commesse' - Modalità: TRUNCATE
+2026-07-03 02:00:46 - INFO - INSERT INTO [Spreadsheet_Commesse] VALUES (...)
+2026-07-03 02:00:46 - INFO - ✓ Successo
+2026-07-03 02:00:46 - INFO - RIEPILOGO ELABORAZIONE:
+2026-07-03 02:00:46 - INFO - Successo: 2/2
+```
+
+## �📊 Esempio di Output
+
+```
+======================================================================
+  Google Sheets to SQL Converter - Batch Mode
+======================================================================
+
+======================================================================
+📥 Inizio elaborazione batch: 2 foglio/i
+======================================================================
+
+[1/2] Elaborazione: Sheet 'Dati_Vendite' da 'aldlad12k34k1lqe23'
+      ✓ Estratti 150 record con 8 colonne
+      ✓ SQL generato (DROP+CREATE) - 165 righe
+      ✓ Inserito su SQL Server
+
+[2/2] Elaborazione: Sheet 'Clienti' da 'aldlad12k34k1lqe23'
+      ✓ Estratti 75 record con 5 colonne
+      ✓ SQL generato (INSERT-only) - 78 righe
+      ✓ Inserito su SQL Server
+
+## 📊 Esempio di Output
+
+```
+======================================================================
+  Google Sheets to SQL Converter - Batch Mode
+======================================================================
+
+======================================================================
+📥 Inizio elaborazione batch: 3 foglio/i
+======================================================================
+
+[1/3] Elaborazione: Sheet 'Dati_Vendite' da '1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY'
+      ✓ Estratti 150 record con 8 colonne
+      ✓ SQL generato (CREATE)
+      ✓ Dati inseriti su SQL Server
+
+[2/3] Elaborazione: Sheet 'Clienti' da '1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY'
+      ✓ Estratti 75 record con 5 colonne
+      ✓ SQL generato (TRUNCATE)
+      ✓ Dati inseriti su SQL Server
+
+[3/3] Elaborazione: Sheet 'Storico' da '1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY'
+      ✓ Estratti 42 record con 6 colonne
+      ✓ SQL generato (INSERT)
+      ✓ Dati inseriti su SQL Server
+
+======================================================================
+📊 Elaborazione completata:
+   ✓ Successo: 3/3
+   ❌ Falliti:  0/3
+======================================================================
+```
+
+## 🔍 Risoluzione Problemi
+
+| Errore | Soluzione |
+|--------|-----------|
+| `File 'batch.json' non trovato` | Crea il file batch.json nella stessa cartella con la struttura corretta |
+| `Foglio non trovato` | Verifica il nome esatto del foglio (è case-sensitive) |
+| `Errore di autenticazione Google` | Verifica che il service account abbia accesso al foglio |
+| `Errore di connessione SQL Server` | Controlla server, database e driver ODBC in config.json |
+| `Modalità non valida` | Usa solo "create", "truncate", o "insert" nel campo dropCreate |
+
+## 📝 Note Importanti
+
+- **Nomi colonne**: Spazi e caratteri speciali → underscore
+- **Celle vuote**: Diventano `NULL` nel database
+- **Booleani**: `true/false`, `yes/no`, `1/0` → `BIT` (0/1)
+- **Date**: Rilevate automaticamente → `DATETIME`
+
+---
+**Versione**: 2.0 - Batch Mode  
+

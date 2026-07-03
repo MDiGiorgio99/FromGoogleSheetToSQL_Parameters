@@ -2,6 +2,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 import sys
+import logging
+import os
 from typing import List, Tuple
 from datetime import datetime
 
@@ -32,6 +34,41 @@ def load_config(config_file: str = 'config.json') -> dict:
 CONFIG = load_config()
 SCOPES = CONFIG.get('google_sheets', {}).get('scopes', ['https://www.googleapis.com/auth/spreadsheets.readonly'])
 CREDENTIALS_FILE = CONFIG.get('google_sheets', {}).get('credentials_file', 'credentials.json')
+
+# Configura il logger
+def setup_logger(log_filename: str = None) -> logging.Logger:
+    """Configura il logger per salvare gli INSERT e gli errori nella cartella 'log'"""
+    # Crea la cartella 'log' se non esiste
+    log_dir = 'log'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    if log_filename is None:
+        log_filename = f"batch_execution_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    
+    # Salva il file nella cartella 'log'
+    log_path = os.path.join(log_dir, log_filename)
+    
+    logger = logging.getLogger('GoogleSheetToSQL')
+    logger.setLevel(logging.INFO)
+    
+    # File handler
+    file_handler = logging.FileHandler(log_path, encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    
+    # Formato del log
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', 
+                                 datefmt='%Y-%m-%d %H:%M:%S')
+    file_handler.setFormatter(formatter)
+    
+    # Aggiungi il file handler al logger
+    if not logger.handlers:  # Evita handler duplicati
+        logger.addHandler(file_handler)
+    
+    return logger
+
+# Crea il logger globale
+LOGGER = setup_logger()
 
 
 class GoogleSheetToSQL:
@@ -74,27 +111,12 @@ class GoogleSheetToSQL:
         sheet_names = [ws.title for ws in self.sheet.worksheets()]
         return sheet_names
 
-    def select_sheet_interactive(self) -> Tuple[str, object]:
-        """Mostra un menu interattivo per scegliere il foglio"""
-        sheets = self.list_sheets()
-        
-        print("\n📄 Fogli disponibili:")
-        for i, sheet_name in enumerate(sheets, 1):
-            print(f"  {i}. {sheet_name}")
-        
-        while True:
-            try:
-                choice = input(f"\nScegli il numero del foglio (1-{len(sheets)}): ").strip()
-                idx = int(choice) - 1
-                if 0 <= idx < len(sheets):
-                    selected_name = sheets[idx]
-                    selected_ws = self.sheet.worksheet(selected_name)
-                    print(f"✓ Selezionato: {selected_name}")
-                    return selected_name, selected_ws
-                else:
-                    print("❌ Numero non valido")
-            except ValueError:
-                print("❌ Inserisci un numero valido")
+    def get_worksheet(self, sheet_name: str) -> object:
+        """Ottiene il foglio per nome"""
+        try:
+            return self.sheet.worksheet(sheet_name)
+        except Exception as e:
+            raise Exception(f"Foglio '{sheet_name}' non trovato: {e}")
 
     def infer_column_type(self, values: List, for_sqlserver: bool = True) -> str:
         """Inferisce il tipo SQL per una colonna con distinzione avanzata"""
@@ -259,8 +281,14 @@ class GoogleSheetToSQL:
         
         return name
 
-    def generate_sql(self, spreadsheet_name: str, sheet_name: str, headers: List[str], data: List[List]) -> str:
-        """Genera SQL DROP + CREATE TABLE + INSERT statements"""
+    def generate_sql(self, spreadsheet_name: str, sheet_name: str, headers: List[str], data: List[List], drop_create: str = "create") -> str:
+        """Genera SQL con opzione di DROP+CREATE, TRUNCATE, o solo INSERT
+        
+        Modalità:
+        - "create": DROP TABLE IF EXISTS + CREATE TABLE + INSERT
+        - "truncate": TRUNCATE TABLE + INSERT
+        - "insert": Solo INSERT (senza modificare la struttura)
+        """
         sql = []
         
         # Pulisci i nomi prima di concatenarli
@@ -268,26 +296,48 @@ class GoogleSheetToSQL:
         clean_sheet_name = self.clean_table_name(sheet_name)
         table_name = f"{clean_spreadsheet_name}_{clean_sheet_name}"
         
-        # DROP TABLE IF EXISTS + CREATE TABLE (sintassi corretta SQL Server)
         sql.append(f"-- Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')};")
-        sql.append(f"\nDROP TABLE IF EXISTS [{table_name}];")
-        sql.append(f"\nCREATE TABLE [{table_name}] (")
         
-        # Inferisci i tipi di colonna (ottimizzati per SQL Server)
-        column_types = []
-        for col_idx, header in enumerate(headers):
-            values = [row[col_idx] if col_idx < len(row) else '' for row in data]
-            col_type = self.infer_column_type(values, for_sqlserver=True)
-            column_types.append(col_type)
+        # Genera comandi specifici in base alla modalità
+        if drop_create == "create":
+            # DROP + CREATE (ricrea la tabella)
+            sql.append(f"\nDROP TABLE IF EXISTS [{table_name}];")
+            sql.append(f"\nCREATE TABLE [{table_name}] (")
             
-            clean_header = header.replace(' ', '_').replace('-', '_')
-            sql.append(f"    [{clean_header}] {col_type},")
+            # Inferisci i tipi di colonna (ottimizzati per SQL Server)
+            column_types = []
+            for col_idx, header in enumerate(headers):
+                values = [row[col_idx] if col_idx < len(row) else '' for row in data]
+                col_type = self.infer_column_type(values, for_sqlserver=True)
+                column_types.append(col_type)
+                
+                clean_header = header.replace(' ', '_').replace('-', '_')
+                sql.append(f"    [{clean_header}] {col_type},")
+            
+            # Rimuovi la virgola dall'ultima colonna
+            if sql[-1].endswith(","):
+                sql[-1] = sql[-1][:-1]
+            
+            sql.append(");")
         
-        # Rimuovi la virgola dall'ultima colonna
-        if sql[-1].endswith(","):
-            sql[-1] = sql[-1][:-1]
+        elif drop_create == "truncate":
+            # TRUNCATE (svuota ma mantiene la struttura)
+            sql.append(f"\nTRUNCATE TABLE [{table_name}];")
+            
+            # Inferisci i tipi comunque (potrebbero servire per conversioni)
+            column_types = []
+            for col_idx, header in enumerate(headers):
+                values = [row[col_idx] if col_idx < len(row) else '' for row in data]
+                col_type = self.infer_column_type(values, for_sqlserver=True)
+                column_types.append(col_type)
         
-        sql.append(");")
+        else:  # "insert" o qualsiasi altro valore
+            # Solo INSERT (mantieni la struttura e i dati)
+            column_types = []
+            for col_idx, header in enumerate(headers):
+                values = [row[col_idx] if col_idx < len(row) else '' for row in data]
+                col_type = self.infer_column_type(values, for_sqlserver=True)
+                column_types.append(col_type)
         
         # INSERT statements
         sql.append(f"\n-- Insert {len(data)} records;")
@@ -331,7 +381,7 @@ class GoogleSheetToSQL:
 
     def execute_on_sqlserver(self, sql: str, server: str = None, database: str = None, 
                             use_windows_auth: bool = None, username: str = None, password: str = None) -> bool:
-        """Esegue la query su SQL Server"""
+        """Esegue la query su SQL Server con logging degli INSERT e degli errori"""
         if not PYODBC_AVAILABLE:
             print("❌ Modulo pyodbc non installato!")
             print("   Installa con: pip install pyodbc")
@@ -342,31 +392,23 @@ class GoogleSheetToSQL:
         default_server = sql_server_config.get('default_server', '')
         default_database = sql_server_config.get('default_database', '')
         default_auth = sql_server_config.get('use_windows_auth', True)
+        default_username = sql_server_config.get('username')
+        default_password = sql_server_config.get('password')
         
-        # Chiedi i dettagli se non forniti
-        if server is None:
-            if default_server:
-                print(f"🔧 Server default (config.json): {default_server}")
-                server = input(f"Inserisci il nome del server SQL Server (default: {default_server}): ").strip()
-                if not server:
-                    server = default_server
-            else:
-                server = input("\nInserisci il nome del server SQL Server (es: localhost, .\\SQLEXPRESS): ").strip()
-        
-        if database is None:
-            if default_database:
-                print(f"🔧 Database default (config.json): {default_database}")
-                database = input(f"Inserisci il nome del database (default: {default_database}): ").strip()
-                if not database:
-                    database = default_database
-            else:
-                database = input("Inserisci il nome del database: ").strip()
-        
+        # Usa i default se non forniti
+        server = server or default_server
+        database = database or default_database
         if use_windows_auth is None:
             use_windows_auth = default_auth
         
+        # Se non forniti come parametri, usa quelli del config
+        if username is None:
+            username = default_username
+        if password is None:
+            password = default_password
+        
         if not server or not database:
-            print("❌ Server e database sono obbligatori")
+            print("❌ Server e database sono obbligatori in config.json")
             return False
         
         try:
@@ -374,10 +416,9 @@ class GoogleSheetToSQL:
             if use_windows_auth:
                 conn_str = f'Driver={{ODBC Driver 17 for SQL Server}};Server={server};Database={database};Trusted_Connection=yes;'
             else:
-                if username is None:
-                    username = input("Username SQL Server: ").strip()
-                if password is None:
-                    password = input("Password: ").strip()
+                if username is None or password is None:
+                    print("❌ Username e password sono obbligatori per autenticazione SQL")
+                    return False
                 conn_str = f'Driver={{ODBC Driver 17 for SQL Server}};Server={server};Database={database};UID={username};PWD={password};'
             
             conn = pyodbc.connect(conn_str)
@@ -386,148 +427,213 @@ class GoogleSheetToSQL:
             # Dividi i comandi
             commands = [cmd.strip() for cmd in sql.split(';') if cmd.strip()]
             
-            print(f"\n📋 Esecuzione di {len(commands)} comandi...")
             for i, command in enumerate(commands):
-                if command.startswith('--'):  # Salta i commenti
+                if command.startswith('--'):  # Salta i commenti ma loggali
                     continue
+                
+                # Logga l'INSERT statement SEMPRE (prima dell'esecuzione)
+                if command.upper().startswith('INSERT INTO'):
+                    LOGGER.info(command)
+                
                 try:
-                    # Mostra anteprima del comando (primi 80 caratteri)
-                    preview = command[:80].replace('\n', ' ')
-                    print(f"  [{i}] {preview}..." if len(command) > 80 else f"  [{i}] {preview}")
                     cursor.execute(command)
+                    
+                    # Log di successo per INSERT
+                    if command.upper().startswith('INSERT INTO'):
+                        LOGGER.info("✓ Successo\n")
+                
                 except Exception as e:
-                    print(f"\n❌ Errore nel comando {i+1}: {e}")
+                    # Logga l'errore per INSERT
+                    if command.upper().startswith('INSERT INTO'):
+                        LOGGER.error(f"❌ Errore: {str(e)}\n")
+                    else:
+                        # Per altri comandi, logga ugualmente
+                        LOGGER.error(f"❌ Errore nel comando: {command[:100]}...")
+                        LOGGER.error(f"   Dettagli: {str(e)}")
+                    
+                    # Non fare rollback - continua con gli altri comandi
+                    print(f"⚠️  Errore nel comando {i+1}: {e}")
                     print(f"   Comando: {command[:100]}...")
-                    conn.rollback()
-                    return False
             
             conn.commit()
             conn.close()
-            print(f"\n✓ Query eseguita con successo su SQL Server: {server}/{database}")
+            LOGGER.info("=" * 70)
+            LOGGER.info("Elaborazione completata con successo")
+            LOGGER.info("=" * 70)
             return True
         
         except Exception as e:
-            print(f"\n❌ Errore di connessione a SQL Server: {e}")
-            print("💡 Verifica: server, database, credenziali, driver ODBC installato")
+            print(f"❌ Errore di connessione a SQL Server: {e}")
+            print("💡 Verifica: server, database, credenziali, driver ODBC")
+            LOGGER.error(f"❌ Errore di connessione a SQL Server: {e}")
             return False
 
 
-def process_sheet(converter, sheet_names_count: int = None):
-    """Elabora un singolo foglio: selezione, estrazione, generazione SQL e salvataggio"""
+def process_batch(converter, download_config: List[dict], use_windows_auth: bool = True):
+    """Elabora un batch di fogli da salvare su SQL Server"""
+    total = len(download_config)
+    success_count = 0
+    failed_count = 0
     
-    # Seleziona il foglio
-    sheet_name, worksheet = converter.select_sheet_interactive()
+    # Log inizio elaborazione
+    LOGGER.info("=" * 70)
+    LOGGER.info(f"INIZIO ELABORAZIONE BATCH: {total} foglio/i")
+    LOGGER.info("=" * 70)
     
-    # Estrai dati
-    headers, data = converter.get_data_and_headers(worksheet)
+    print(f"\n{'=' * 70}")
+    print(f"📥 Inizio elaborazione batch: {total} foglio/i")
+    print(f"{'=' * 70}\n")
     
-    if not headers or not data:
-        print("❌ Nessun dato da esportare")
-        return False
+    for idx, config in enumerate(download_config, 1):
+        try:
+            spreadsheet_id = config.get('spreadsheet')
+            sheet_name = config.get('sheet')
+            
+            # Leggi dropCreate e converti per backward compatibility
+            drop_create_value = config.get('dropCreate', 'create')
+            
+            # Se è un booleano (per backward compatibility), converti a stringa
+            if isinstance(drop_create_value, bool):
+                drop_create = "create" if drop_create_value else "insert"
+            else:
+                drop_create = str(drop_create_value).lower()
+            
+            # Valida il valore
+            if drop_create not in ['create', 'truncate', 'insert']:
+                print(f"        ⚠️  Modalità '{drop_create}' non valida, uso 'create' di default")
+                drop_create = 'create'
+            
+            print(f"[{idx}/{total}] Elaborazione: Sheet '{sheet_name}' da '{spreadsheet_id}'")
+            LOGGER.info(f"[{idx}/{total}] Elaborazione: Sheet '{sheet_name}' - Modalità: {drop_create.upper()}")
+            
+            # Apri lo spreadsheet
+            converter.open_spreadsheet(spreadsheet_id)
+            
+            # Ottieni il foglio
+            worksheet = converter.get_worksheet(sheet_name)
+            
+            # Estrai dati
+            headers, data = converter.get_data_and_headers(worksheet)
+            
+            if not headers or not data:
+                print(f"        ❌ Nessun dato trovato nel foglio")
+                LOGGER.warning(f"Nessun dato trovato nel foglio '{sheet_name}'")
+                failed_count += 1
+                continue
+            
+            print(f"        ✓ Estratti {len(data)} record con {len(headers)} colonne")
+            LOGGER.info(f"Estratti {len(data)} record con {len(headers)} colonne")
+            
+            # Genera SQL
+            spreadsheet_name = converter.sheet.title
+            sql = converter.generate_sql(spreadsheet_name, sheet_name, headers, data, drop_create=drop_create)
+            print(f"        ✓ SQL generato ({drop_create.upper()})")
+            
+            # Esegui su SQL Server
+            if converter.execute_on_sqlserver(sql, use_windows_auth=use_windows_auth):
+                print(f"        ✓ Dati inseriti su SQL Server\n")
+                success_count += 1
+            else:
+                print(f"        ❌ Errore nell'esecuzione su SQL Server\n")
+                LOGGER.error(f"Errore nell'esecuzione su SQL Server per il foglio '{sheet_name}'")
+                failed_count += 1
+                
+        except Exception as e:
+            print(f"        ❌ Errore: {str(e)}\n")
+            LOGGER.error(f"Eccezione durante l'elaborazione: {str(e)}")
+            failed_count += 1
     
-    # Mostra preview
-    print("\n📋 Preview dei dati:")
-    print(f"  Colonne: {', '.join(headers[:5])}{'...' if len(headers) > 5 else ''}")
-    print(f"  Prime righe: {data[:2] if data else 'Nessun dato'}")
+    # Riepilogo
+    print(f"{'=' * 70}")
+    print(f"📊 Elaborazione completata:")
+    print(f"   ✓ Successo: {success_count}/{total}")
+    print(f"   ❌ Falliti:  {failed_count}/{total}")
+    print(f"{'=' * 70}\n")
     
-    # Genera SQL (nomefile_sheet_name)
-    spreadsheet_name = converter.sheet.title
-    sql = converter.generate_sql(spreadsheet_name, sheet_name, headers, data)
+    # Log riepilogo
+    LOGGER.info("=" * 70)
+    LOGGER.info(f"RIEPILOGO ELABORAZIONE:")
+    LOGGER.info(f"Successo: {success_count}/{total}")
+    LOGGER.info(f"Falliti: {failed_count}/{total}")
+    LOGGER.info("=" * 70)
     
-    # Mostra anteprima SQL
-    print("\n📝 Anteprima SQL (prime 20 righe):")
-    sql_lines = sql.split('\n')[:20]
-    for line in sql_lines:
-        print(f"  {line}")
-    if len(sql.split('\n')) > 20:
-        print("  ...")
-    
-    # Menu: Esegui o Salva
-    print("\n" + "=" * 60)
-    print("💾 Cosa vuoi fare?")
-    print("  1. Esegui query su SQL Server")
-    print("  2. Salva come file .sql")
-    print("  3. Esegui e salva")
-    print("=" * 60)
-    
-    while True:
-        choice = input("\nScegli un'opzione (1-3): ").strip()
-        if choice in ['1', '2', '3']:
-            break
-        print("❌ Opzione non valida")
-    
-    # Esegui su database
-    if choice in ['1', '3']:
-        auth = input("\nUsa autenticazione Windows? (s/n): ").strip().lower()
-        use_windows_auth = auth == 's'
-        converter.execute_on_sqlserver(sql, use_windows_auth=use_windows_auth)
-    
-    # Salva file
-    if choice in ['2', '3']:
-        save = input("\nSalvare su file? (s/n): ").strip().lower()
-        if save == 's':
-            filename = input("Nome file (default: auto): ").strip()
-            converter.export_to_file(sql, filename if filename else None)
-    
-    # Copia negli appunti (solo su Windows)
-    try:
-        import pyperclip
-        copy = input("\nCopiare il SQL negli appunti? (s/n): ").strip().lower()
-        if copy == 's':
-            pyperclip.copy(sql)
-            print("✓ SQL copiato negli appunti")
-    except ImportError:
-        pass
-    
-    return True
+    return success_count, failed_count
 
 
 def main():
-    """Funzione principale"""
-    print("=" * 60)
-    print("  Google Sheets to SQL Converter")
-    print("=" * 60)
+    """Elabora un batch di sheet da un file batch.json"""
+    print("=" * 70)
+    print("  Google Sheets to SQL Converter - Batch Mode")
+    print("=" * 70)
     
-    # Leggi il default Google Sheet ID dal config
-    google_sheets_config = CONFIG.get('google_sheets', {})
-    default_sheet_id = google_sheets_config.get('default_sheet_id', '')
+    # Mostra il file di log
+    log_file = LOGGER.handlers[0].baseFilename if LOGGER.handlers else "batch_execution.log"
+    print(f"\n📝 Log salvato in: {log_file}\n")
     
-    # Chiedi l'ID del Google Sheet
-    if default_sheet_id:
-        print(f"🔧 Google Sheet ID default (config.json): {default_sheet_id}")
-        sheet_id = input(f"\nInserisci l'ID del Google Sheet (default: {default_sheet_id}): ").strip()
-        if not sheet_id:
-            sheet_id = default_sheet_id
-    else:
-        sheet_id = input("\nInserisci l'ID del Google Sheet (dalla URL): ").strip()
-    
-    if not sheet_id:
-        print("❌ ID non fornito")
+    # Richiedi il file di configurazione come parametro obbligatorio
+    if len(sys.argv) < 2:
+        print("\n❌ Errore: Devi specificare il file di configurazione")
+        print("\nUtilizzo:")
+        print("  python GoogleSheet_to_SQL.py batch.json")
+        print("\nEsempio:")
+        print("  python GoogleSheet_to_SQL.py batch.json")
         input("\nPremi INVIO per chiudere...")
         sys.exit(1)
     
-    # Inizializza
+    download_file = sys.argv[1]
+    
+    # Verifica che il file esista
+    try:
+        with open(download_file, 'r', encoding='utf-8') as f:
+            download_config = json.load(f)
+    except FileNotFoundError:
+        print(f"\n❌ Errore: File '{download_file}' non trovato.")
+        print(f"   Crea il file con la seguente struttura:")
+        print(f"""
+[{{
+  "spreadsheet": "ID_DELLO_SHEET",
+  "sheet": "Nome del foglio",
+  "dropCreate": true
+}},
+{{
+  "spreadsheet": "ID_DELLO_SHEET",
+  "sheet": "Nome del foglio",
+  "dropCreate": false
+}}]
+""")
+        input("\nPremi INVIO per chiudere...")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(f"\n❌ Errore: Il file '{download_file}' non è un JSON valido")
+        input("\nPremi INVIO per chiudere...")
+        sys.exit(1)
+    
+    # Valida il formato
+    if not isinstance(download_config, list) or len(download_config) == 0:
+        print(f"\n❌ Errore: Il file '{download_file}' deve contenere un array JSON non vuoto")
+        input("\nPremi INVIO per chiudere...")
+        sys.exit(1)
+    
+    # Valida gli elementi
+    required_keys = ['spreadsheet', 'sheet']
+    for idx, config in enumerate(download_config):
+        for key in required_keys:
+            if key not in config:
+                print(f"\n❌ Errore: Elemento {idx+1} non contiene il campo '{key}'")
+                input("\nPremi INVIO per chiudere...")
+                sys.exit(1)
+    
+    # Inizializza il converter
     converter = GoogleSheetToSQL(CREDENTIALS_FILE)
-    converter.open_spreadsheet(sheet_id)
     
-    # Loop: elabora fogli finché l'utente non decide di uscire
-   
-    while True:
-        if not process_sheet(converter):
-            continue
-        
-        # Chiedi se vuole scaricare dati da altri fogli
-        print("\n" + "=" * 60)
-        while True:
-            another = input("\n📄 Vuoi scaricare dati da un altro foglio? (s/n): ").strip().lower()
-            if another in ['s', 'n']:
-                break
-            print("❌ Inserisci 's' per sì o 'n' per no")
-        
-        if another != 's':
-            break
+    # Leggi config per l'autenticazione a SQL Server
+    sql_server_config = CONFIG.get('sql_server', {})
+    default_auth = sql_server_config.get('use_windows_auth', True)
     
-    print("\n✓ Processo completato!")
+    # Elabora il batch
+    process_batch(converter, download_config, use_windows_auth=default_auth)
+    
+    print("✓ Processo completato!")
 
 
 if __name__ == "__main__":

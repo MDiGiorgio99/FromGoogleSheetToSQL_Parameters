@@ -3,13 +3,14 @@
     "scopes": [
       "https://www.googleapis.com/auth/spreadsheets.readonly"
     ],
-    "credentials_file": "credentials.json",
-    "default_sheet_id": "YOUR_SHEET_ID"
+    "credentials_file": "credentials.json"
   },
   "sql_server": {
     "default_server": "localhost",
-    "default_database": "YOUR_DATABASE",
-    "use_windows_auth": true
+    "default_database": "TestExtraction",
+    "use_windows_auth": true,
+    "username": null,
+    "password": null
   },
   "sql_generation": {
     "string_type": "VARCHAR(MAX)",

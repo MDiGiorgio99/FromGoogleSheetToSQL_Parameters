@@ -1,0 +1,17 @@
+[
+  {
+    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
+    "sheet": "Commesse",
+    "dropCreate": "truncate"
+  },
+  {
+    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
+    "sheet": "CostoKM",
+    "dropCreate": "truncate"
+  },
+  {
+    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
+    "sheet": "Dizionari",
+    "dropCreate": "create"
+  }
+]
