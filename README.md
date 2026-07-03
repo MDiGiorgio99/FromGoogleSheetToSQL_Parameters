@@ -11,6 +11,13 @@ Estrae automaticamente dati da molteplici Google Sheets e li inserisce in SQL Se
 
 ## Setup Iniziale
 
+### 0. Clona il Repository
+
+```bash
+git clone https://github.com/MDiGiorgio99/FromGoogleSheetToSQL_Parameters.git
+cd FromGoogleSheetToSQL_Parameters
+```
+
 ### 1. Installa le dipendenze
 
 ```bash
