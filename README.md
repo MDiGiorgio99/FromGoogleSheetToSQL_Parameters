@@ -68,18 +68,18 @@ File che specifica quali fogli estrarre e come processarli:
 ```json
 [
   {
-    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
-    "sheet": "Dati_Vendite",
+    "spreadsheet": "YOUR_PARENT_SHEET_ID",
+    "sheet": "SHEET_NAME",
     "dropCreate": "create"
   },
   {
-    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
-    "sheet": "Clienti",
+    "spreadsheet": "YOUR_PARENT_SHEET_ID",
+    "sheet": "SHEET_NAME",
     "dropCreate": "truncate"
   },
   {
-    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
-    "sheet": "Storico",
+    "spreadsheet": "YOUR_PARENT_SHEET_ID",
+    "sheet": "SHEET_NAME",
     "dropCreate": "insert"
   }
 ]
@@ -103,7 +103,7 @@ Mantiene le configurazioni di connessione:
   },
   "sql_server": {
     "default_server": "localhost",
-    "default_database": "TestExtraction",
+    "default_database": "YOUR_DB",
     "use_windows_auth": true,
     "username": null,
     "password": null
