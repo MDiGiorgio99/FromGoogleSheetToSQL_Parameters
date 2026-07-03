@@ -156,12 +156,8 @@ python GoogleSheet_to_SQL.py batch.json
 
 #### Dalla riga di comando (PowerShell/CMD):
 ```bash
-cd C:\Latitudo\FromGoogleSheetToSQL_Parameters
 .\GoogleSheet_to_SQL.exe batch.json
 ```
-
-#### Automaticamente con Windows Task Scheduler:
-Vedi la sezione **"Schedulazione Automatica (Windows Task Scheduler)"** sotto per le istruzioni complete.
 
 ⚠️ **Il file di configurazione è obbligatorio** - deve essere specificato come parametro della riga di comando.
 
@@ -207,10 +203,10 @@ Clicca "New" e imposta:
 Program/script:
 C:\Latitudo\FromGoogleSheetToSQL_Parameters\dist\GoogleSheet_to_SQL.exe
 
-Add arguments (optional):
+Add arguments:
 batch.json
 
-Start in (optional):
+Start in:
 C:\Latitudo\FromGoogleSheetToSQL_Parameters
 ```
 
@@ -245,27 +241,6 @@ Esempio di log:
 2026-07-03 02:00:46 - INFO - RIEPILOGO ELABORAZIONE:
 2026-07-03 02:00:46 - INFO - Successo: 2/2
 ```
-
-## �📊 Esempio di Output
-
-```
-======================================================================
-  Google Sheets to SQL Converter - Batch Mode
-======================================================================
-
-======================================================================
-📥 Inizio elaborazione batch: 2 foglio/i
-======================================================================
-
-[1/2] Elaborazione: Sheet 'Dati_Vendite' da 'aldlad12k34k1lqe23'
-      ✓ Estratti 150 record con 8 colonne
-      ✓ SQL generato (DROP+CREATE) - 165 righe
-      ✓ Inserito su SQL Server
-
-[2/2] Elaborazione: Sheet 'Clienti' da 'aldlad12k34k1lqe23'
-      ✓ Estratti 75 record con 5 colonne
-      ✓ SQL generato (INSERT-only) - 78 righe
-      ✓ Inserito su SQL Server
 
 ## 📊 Esempio di Output
 
