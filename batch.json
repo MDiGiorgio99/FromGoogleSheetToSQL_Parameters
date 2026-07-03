@@ -1,17 +1,17 @@
 [
   {
-    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
-    "sheet": "Commesse",
+    "spreadsheet": "YOUR_PARENT_SHEET_ID",
+    "sheet": "SHEET_NAME",
     "dropCreate": "truncate"
   },
   {
-    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
-    "sheet": "CostoKM",
+    "spreadsheet": "YOUR_PARENT_SHEET_ID",
+    "sheet": "SHEET_NAME",
     "dropCreate": "truncate"
   },
   {
-    "spreadsheet": "1q2Sjp0AR9i4ieNeqy2IUHfRXwk19OCcVHlTQYLS9lcY",
-    "sheet": "Dizionari",
+    "spreadsheet": "YOUR_PARENT_SHEET_ID",
+    "sheet": "SHEET_NAME",
     "dropCreate": "create"
   }
 ]
