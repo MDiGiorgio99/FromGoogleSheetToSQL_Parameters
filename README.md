@@ -114,6 +114,9 @@ Mantiene le configurazioni di connessione:
     "float_type": "FLOAT",
     "bool_type": "BIT",
     "datetime_type": "DATETIME"
+  },
+  "logging": {
+    "log_level": "errors"
   }
 }
 ```
@@ -125,6 +128,40 @@ Mantiene le configurazioni di connessione:
 - `use_windows_auth`: `true` per autenticazione Windows, `false` per SQL Server
 - `username`: username SQL Server (usato solo se `use_windows_auth` è `false`)
 - `password`: password SQL Server (usato solo se `use_windows_auth` è `false`)
+- `log_level`: Livello di dettaglio del logging:
+  - **`"errors"`** (predefinito): Registra solo gli errori 
+  - **`"full"`**: Registra tutto (INSERT statements, operazioni completate, errori) 
+
+#### Configurazione del Logging
+
+La configurazione del logging ti permette di controllare il livello di dettaglio dei file di log generati:
+
+**Modalità "errors" (predefinita)**:
+```json
+"logging": {
+  "log_level": "errors"
+}
+```
+✅ Registra solo gli errori:
+- Errori durante la connessione
+- Errori SQL
+- Fallimenti dell'esecuzione
+- File di log minimale
+
+
+**Modalità "full"**:
+```json
+"logging": {
+  "log_level": "full"
+}
+```
+✅ Registra tutti i dettagli:
+- Inizio e fine dell'elaborazione
+- Ogni INSERT statement eseguito
+- Operazioni completate
+- Errori SQL
+- Riepilogo completo
+
 
 #### Modalità Autenticazione
 
@@ -251,6 +288,8 @@ Esempio di log:
 
 ## 📊 Esempio di Output
 
+### Output Console (visualizzazione su schermo)
+
 ```
 ======================================================================
   Google Sheets to SQL Converter - Batch Mode
@@ -280,6 +319,60 @@ Esempio di log:
    ✓ Successo: 3/3
    ❌ Falliti:  0/3
 ======================================================================
+```
+
+### Output Log File
+
+#### 📝 Modalità "errors" (predefinita)
+
+Il file di log conterrà **solo gli errori** (se presenti). Se l'elaborazione è andata bene, il file sarà vuoto oppure vuoto:
+
+```
+[LOG VUOTO - Nessun errore]
+```
+
+Se si verifica un errore:
+
+```
+2026-07-06 14:30:52 - ERROR - ❌ Errore di connessione a SQL Server: ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456) (SQLState: 42000; NativeError: 18456)')
+2026-07-06 14:30:52 - ERROR - ❌ Errore nel comando: INSERT INTO [Spreadsheet_Dati] VALUES ...
+2026-07-06 14:30:52 - ERROR -    Dettagli: Syntax error near 'VALUES'
+```
+
+
+#### 📝 Modalità "full"
+
+Il file di log conterrà **tutte le operazioni e gli errori**:
+
+```
+2026-07-06 14:30:45 - INFO - ======================================================================
+2026-07-06 14:30:45 - INFO - INIZIO ELABORAZIONE BATCH: 3 foglio/i
+2026-07-06 14:30:45 - INFO - ======================================================================
+2026-07-06 14:30:46 - INFO - [1/3] Elaborazione: Sheet 'Dati_Vendite' - Modalità: CREATE
+2026-07-06 14:30:46 - INFO - Estratti 150 record con 8 colonne
+2026-07-06 14:30:47 - INFO - INSERT INTO [Spreadsheet_Dati_Vendite] VALUES ('2026-01-05', 'Acme Corp', 5000.00, 'Completato', NULL, 1, 'IT', '2026-01-05 10:30:00')
+2026-07-06 14:30:47 - INFO - ✓ Successo
+2026-07-06 14:30:47 - INFO - INSERT INTO [Spreadsheet_Dati_Vendite] VALUES ('2026-01-06', 'Tech Solutions', 3500.50, 'Completato', NULL, 1, 'IT', '2026-01-06 11:15:00')
+2026-07-06 14:30:47 - INFO - ✓ Successo
+2026-07-06 14:30:47 - INFO - INSERT INTO [Spreadsheet_Dati_Vendite] VALUES ('2026-01-07', 'Global Industries', 7200.00, 'In sospeso', NULL, 2, 'EU', '2026-01-07 14:45:00')
+2026-07-06 14:30:47 - INFO - ✓ Successo
+... [150 record totali] ...
+2026-07-06 14:31:02 - INFO - [2/3] Elaborazione: Sheet 'Clienti' - Modalità: TRUNCATE
+2026-07-06 14:31:02 - INFO - Estratti 75 record con 5 colonne
+2026-07-06 14:31:03 - INFO - INSERT INTO [Spreadsheet_Clienti] VALUES ('Acme Corp', 'acme@company.com', '+39 06 1234567', 'Roma', 'Italia')
+2026-07-06 14:31:03 - INFO - ✓ Successo
+... [75 record totali] ...
+2026-07-06 14:31:45 - INFO - [3/3] Elaborazione: Sheet 'Storico' - Modalità: INSERT
+2026-07-06 14:31:45 - INFO - Estratti 42 record con 6 colonne
+... [42 record totali] ...
+2026-07-06 14:32:10 - INFO - ======================================================================
+2026-07-06 14:32:10 - INFO - Elaborazione completata con successo
+2026-07-06 14:32:10 - INFO - ======================================================================
+2026-07-06 14:32:10 - INFO - ======================================================================
+2026-07-06 14:32:10 - INFO - RIEPILOGO ELABORAZIONE:
+2026-07-06 14:32:10 - INFO - Successo: 3/3
+2026-07-06 14:32:10 - INFO - Falliti: 0/3
+2026-07-06 14:32:10 - INFO - ======================================================================
 ```
 
 ## 🔍 Risoluzione Problemi

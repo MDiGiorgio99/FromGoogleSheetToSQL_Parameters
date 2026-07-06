@@ -18,5 +18,8 @@
     "float_type": "FLOAT",
     "bool_type": "BIT",
     "datetime_type": "DATETIME"
+  },
+  "logging": {
+    "log_level": "errors"
   }
 }

@@ -37,7 +37,12 @@ CREDENTIALS_FILE = CONFIG.get('google_sheets', {}).get('credentials_file', 'cred
 
 # Configura il logger
 def setup_logger(log_filename: str = None) -> logging.Logger:
-    """Configura il logger per salvare gli INSERT e gli errori nella cartella 'log'"""
+    """Configura il logger per salvare gli INSERT e gli errori nella cartella 'log'
+    
+    La modalità di logging è controllata dal flag 'log_level' nel config:
+    - "full": Registra tutto (INSERT, operazioni, errori) - modalità dettagliata
+    - "errors": Registra solo errori - file di log più piccolo
+    """
     # Crea la cartella 'log' se non esiste
     log_dir = 'log'
     if not os.path.exists(log_dir):
@@ -50,11 +55,21 @@ def setup_logger(log_filename: str = None) -> logging.Logger:
     log_path = os.path.join(log_dir, log_filename)
     
     logger = logging.getLogger('GoogleSheetToSQL')
-    logger.setLevel(logging.INFO)
+    
+    # Leggi il flag di logging dal config
+    log_level_config = CONFIG.get('logging', {}).get('log_level', 'full').lower()
+    
+    # Imposta il livello di logging basato sul config
+    if log_level_config == 'errors':
+        logger.setLevel(logging.ERROR)
+        log_level = logging.ERROR
+    else:  # 'full' o qualsiasi altro valore default a 'full'
+        logger.setLevel(logging.INFO)
+        log_level = logging.INFO
     
     # File handler
     file_handler = logging.FileHandler(log_path, encoding='utf-8')
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(log_level)
     
     # Formato del log
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', 
